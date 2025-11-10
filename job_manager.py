@@ -11,7 +11,7 @@ def enqueue_job(command, max_retries):
         "INSERT INTO jobs (id, command, state, attempts, max_retries, created_at, updated_at) VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))",
         (job_id, command, "pending", 0, max_retries),
     )
-    print(f"🧾 Job enqueued: {job_id}")
+    print(f" Job enqueued: {job_id}")
     return job_id
 
 
@@ -23,11 +23,11 @@ def run_job(job):
         result = subprocess.run(command, shell=True)
         if result.returncode == 0:
             execute_query("UPDATE jobs SET state='completed', updated_at=datetime('now') WHERE id=?", (job_id,))
-            print(f"✅ Job {job_id} completed successfully")
+            print(f" Job {job_id} completed successfully")
         else:
             handle_failure(job)
     except Exception as e:
-        print(f"❌ Job {job_id} failed: {e}")
+        print(f" Job {job_id} failed: {e}")
         handle_failure(job)
 
 
@@ -38,16 +38,17 @@ def handle_failure(job):
     cfg = load_config()
     delay = cfg["backoff_base"] ** new_attempts
     if new_attempts <= max_retries:
-        print(f"⚠️ Job {job_id} failed. Retrying in {delay}s (attempt {new_attempts}/{max_retries})")
+        print(f" Job {job_id} failed. Retrying in {delay}s (attempt {new_attempts}/{max_retries})")
         time.sleep(delay)
         execute_query(
             "UPDATE jobs SET attempts=?, state='pending', updated_at=datetime('now') WHERE id=?",
             (new_attempts, job_id),
         )
     else:
-        print(f"💀 Job {job_id} moved to DLQ after {max_retries} attempts")
+        print(f" Job {job_id} moved to DLQ after {max_retries} attempts")
         execute_query("DELETE FROM jobs WHERE id=?", (job_id,))
         execute_query(
             "INSERT INTO dlq (id, command, failed_at) VALUES (?, ?, datetime('now'))",
             (job_id, command),
+
         )
